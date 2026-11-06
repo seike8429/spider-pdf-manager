@@ -1,0 +1,9 @@
+Spider PDF Manager portable mode
+
+While this file sits next to spider-pdf-manager.exe, Spider PDF Manager keeps its settings, log files, crash-recovery
+autosaves and new digital IDs in the SpiderPDFManagerData folder beside it, and writes nothing to
+%APPDATA% or %LOCALAPPDATA%. Copy the whole folder to move Spider PDF Manager with its settings.
+
+Delete this file to use the normal per-user folders (%APPDATA%\Spider PDF Manager and
+%LOCALAPPDATA%\Spider PDF Manager) instead. If SpiderPDFManagerData can't be written (for example on a read-only
+drive), Spider PDF Manager says so and uses the per-user folders instead.

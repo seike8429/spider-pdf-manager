@@ -1,0 +1,329 @@
+{
+  "id": "spider-pdf-manager",
+  "name": "Spider PDF Manager",
+  "upgradeCode": "00A8ABA8-8113-4301-8123-E723A940EE16",
+  "sources": [
+    "pdfcraft.wxs",
+    "installer-ui.wxs"
+  ],
+  "icon": "assets/app-icon/spider-pdf-manager.ico",
+  "localization": [],
+  "extensions": [],
+  "payloads": [
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+    "LICENSE-document.txt",
+    "NOTICE",
+    "spider-pdf-manager-cli.exe",
+    "spider-pdf-manager.exe"
+  ],
+  "registry": [
+    [
+      "-1",
+      "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\spider-pdf-manager.exe",
+      "",
+      "[#SpiderExe]"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SpiderPDFManager.Document",
+      "",
+      "PDF Document"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SpiderPDFManager.Document\\DefaultIcon",
+      "",
+      "\"[#SpiderExe]\",-2"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SpiderPDFManager.Document\\shell\\open\\command",
+      "",
+      "\"[#SpiderExe]\" \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SpiderPDFManager.Document",
+      "TypeOverlay",
+      ""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\.pdf\\OpenWithProgids",
+      "SpiderPDFManager.Document",
+      ""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\Applications\\spider-pdf-manager.exe",
+      "FriendlyAppName",
+      "Spider PDF Manager"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\Applications\\spider-pdf-manager.exe\\DefaultIcon",
+      "",
+      "\"[#SpiderExe]\",-2"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\Applications\\spider-pdf-manager.exe\\SupportedTypes",
+      ".pdf",
+      ""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\Applications\\spider-pdf-manager.exe\\shell\\open\\command",
+      "",
+      "\"[#SpiderExe]\" \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\SpiderPDFManager\\Capabilities",
+      "ApplicationName",
+      "Spider PDF Manager"
+    ],
+    [
+      "-1",
+      "Software\\SpiderPDFManager\\Capabilities",
+      "ApplicationDescription",
+      "Open-source PDF workbench"
+    ],
+    [
+      "-1",
+      "Software\\SpiderPDFManager\\Capabilities",
+      "ApplicationIcon",
+      "[#SpiderExe],0"
+    ],
+    [
+      "-1",
+      "Software\\SpiderPDFManager\\Capabilities\\FileAssociations",
+      ".pdf",
+      "SpiderPDFManager.Document"
+    ],
+    [
+      "-1",
+      "Software\\RegisteredApplications",
+      "Spider PDF Manager",
+      "Software\\SpiderPDFManager\\Capabilities"
+    ],
+    [
+      "-1",
+      "Software\\SpiderPDFManager\\Shortcuts",
+      "StartMenu",
+      "#1"
+    ],
+    [
+      "-1",
+      "Software\\SpiderPDFManager\\Shortcuts",
+      "Desktop",
+      "#1"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\SpiderPDFManager.Edit",
+      "",
+      "Edit with Spider PDF Manager"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\SpiderPDFManager.Edit",
+      "Icon",
+      "\"[#SpiderExe]\",0"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\SpiderPDFManager.Edit",
+      "MultiSelectModel",
+      "Document"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\SpiderPDFManager.Edit\\command",
+      "",
+      "\"[#SpiderExe]\" \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\SpiderPDFManager.CreatePdf",
+      "",
+      "Create PDF with Spider PDF Manager\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\SpiderPDFManager.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\SpiderPDFManager.CreatePdf\\command",
+      "",
+      "\"[#SpiderExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\SpiderPDFManager.CreatePdf",
+      "",
+      "Create PDF with Spider PDF Manager\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\SpiderPDFManager.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\SpiderPDFManager.CreatePdf\\command",
+      "",
+      "\"[#SpiderExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\SpiderPDFManager.CreatePdf",
+      "",
+      "Create PDF with Spider PDF Manager\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\SpiderPDFManager.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\SpiderPDFManager.CreatePdf\\command",
+      "",
+      "\"[#SpiderExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\SpiderPDFManager.CreatePdf",
+      "",
+      "Create PDF with Spider PDF Manager\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\SpiderPDFManager.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\SpiderPDFManager.CreatePdf\\command",
+      "",
+      "\"[#SpiderExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\SpiderPDFManager.CreatePdf",
+      "",
+      "Create PDF with Spider PDF Manager\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\SpiderPDFManager.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\SpiderPDFManager.CreatePdf\\command",
+      "",
+      "\"[#SpiderExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\SpiderPDFManager.CreatePdf",
+      "",
+      "Create PDF with Spider PDF Manager\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\SpiderPDFManager.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\SpiderPDFManager.CreatePdf\\command",
+      "",
+      "\"[#SpiderExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\SpiderPDFManager.CreatePdf",
+      "",
+      "Create PDF with Spider PDF Manager\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\SpiderPDFManager.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\SpiderPDFManager.CreatePdf\\command",
+      "",
+      "\"[#SpiderExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\SpiderPDFManager.CreatePdf",
+      "",
+      "Create PDF with Spider PDF Manager\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\SpiderPDFManager.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\SpiderPDFManager.CreatePdf\\command",
+      "",
+      "\"[#SpiderExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\SpiderPDFManager.CreatePdf",
+      "",
+      "Create PDF with Spider PDF Manager\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\SpiderPDFManager.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\SpiderPDFManager.CreatePdf\\command",
+      "",
+      "\"[#SpiderExe]\" --create-images \"%1\""
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\SpiderPDFManager.CreatePdf",
+      "",
+      "Create PDF with Spider PDF Manager\u2026"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\SpiderPDFManager.CreatePdf",
+      "MultiSelectModel",
+      "Single"
+    ],
+    [
+      "-1",
+      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\SpiderPDFManager.CreatePdf\\command",
+      "",
+      "\"[#SpiderExe]\" --create-images \"%1\""
+    ]
+  ],
+  "mode": "dualScope"
+}

@@ -1,0 +1,19 @@
+Spider PDF Manager app icon (spider-pdf-manager.svg, spider-pdf-manager-small.svg and every file derived from them in this
+directory: spider-pdf-manager-1024.png, spider-pdf-manager.icns, spider-pdf-manager.ico, hicolor/).
+
+The 3D red spider on a black shield emblem, generated from the project owner's photo for the Spider
+brand and converted to transparent PNGs (master: spider-pdf-manager-icon-master.png, 1406 px).
+Licensed like the rest of Spider PDF Manager, under either of
+
+  * Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+  * MIT license (https://opensource.org/licenses/MIT)
+
+at your option.
+
+The previous app icon — the engraved lion on a red tile (pdfcraft.svg and its derivatives) — was
+the PdfCraft contributors' original artwork, licensed the same way. It was replaced in the Spider
+PDF Manager fork and is no longer shipped.
+
+Regenerate the derived files from spider-pdf-manager-icon-master.png (the hicolor PNGs with PIL;
+the .icns with the Python builder used for this set, or iconutil on macOS). The SVG masters wrap
+rendered PNGs: no vector master exists yet.
