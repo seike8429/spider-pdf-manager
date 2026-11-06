@@ -1,0 +1,57 @@
+# Spider PDF Manager — Windows build
+# NOTE: this file cannot be synced via gh_sync.py (the API token lacks
+# `workflow` scope). Create it in the repo via the GitHub web UI at
+# .github/workflows/build.yml (repo: seike8429/spider-pdf-manager).
+name: Build Windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    env:
+      PDFCRAFT_REQUIRE_WINRES: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.95
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.95"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Fetch OCR models (optional — built-in OCR engine only)
+        run: cargo xtask models
+        continue-on-error: true
+
+      - name: Build release
+        run: cargo build --release --locked
+
+      - name: Run tests
+        run: cargo test --release --locked --workspace --lib --bins
+        continue-on-error: true
+
+      - name: Stage portable artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist
+          Copy-Item target\release\spider-pdf-manager.exe dist\
+          Copy-Item target\release\spider-pdf-manager-cli.exe dist\
+          if (Test-Path assets\models) { Copy-Item -Recurse assets\models dist\models }
+          Copy-Item LICENSE-APACHE dist\
+          Copy-Item LICENSE-MIT dist\
+          Copy-Item NOTICE dist\
+          Copy-Item README.md dist\
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpiderPDFManager-windows-x64
+          path: dist/
