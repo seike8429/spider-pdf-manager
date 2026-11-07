@@ -10,7 +10,7 @@
 ; Paths are relative to this script's folder (installer/).
 
 #define AppName "Spider PDF Manager"
-#define AppVersion "1.0"
+#define AppVersion "1.1"
 #define AppExe "spider-pdf-manager.exe"
 
 [Setup]

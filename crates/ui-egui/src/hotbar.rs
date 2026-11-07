@@ -166,6 +166,18 @@ fn tool_buttons(ui: &mut egui::Ui, app: &PdfCraftApp, tools: &[String], cell: f3
 
 /// Render core quick tools: Select, Hand, Comment groups, Edit text, and Fill & Sign.
 fn core_tool_buttons(ui: &mut egui::Ui, app: &mut PdfCraftApp, cell: f32, popup_align: egui::RectAlign, t: &Tokens) {
+    // Undo / Redo as clickable toolbar buttons (v1.1): the same commands as Edit ▸
+    // Undo / Ctrl+Z, greyed out when there is nothing to undo or redo.
+    for id in ["edit.undo", "edit.redo"] {
+        let Some(spec) = command(id) else { continue };
+        let shortcut = crate::commands::command_shortcut_label(ui.ctx(), spec.id);
+        let tip = if shortcut.is_empty() { tl!(spec.label).to_owned() } else { format!("{} ({shortcut})", tl!(spec.label)) };
+        let button = ui.add_enabled_ui(app.command_enabled(spec), |ui| icons::button(ui, spec.icon, cell, false, &tip)).inner;
+        if button.clicked() {
+            app.execute(spec.id);
+        }
+    }
+    ui.separator();
     if icons::button(ui, "mouse-pointer-2", cell, app.quick_tool == QuickTool::Select, tl!("Select (V)")).clicked() {
         app.quick_tool = QuickTool::Select;
     }

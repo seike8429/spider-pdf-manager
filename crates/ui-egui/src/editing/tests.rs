@@ -336,6 +336,46 @@ fn a_refused_text_box_is_put_back_whole() {
     assert_eq!(content.select_added, None, "nothing was added to select");
 }
 
+/// Toolbar Undo/Redo (v1.1): a committed text edit must enable the Undo button, Undo
+/// must take the edit back, and Redo must put it back. The buttons use
+/// `command_enabled`, so this is the predicate they show.
+#[test]
+fn toolbar_undo_redo_follow_a_committed_text_edit() {
+    use pdfcraft_engine::commands::command;
+    let mut app = crate::PdfCraftApp::new();
+    app.set_option("language", "en").unwrap();
+    app.open_bytes("a.pdf", None, one_page_pdf()).unwrap();
+    let id = app.views[0].id;
+    let undo = command("edit.undo").unwrap();
+    let redo = command("edit.redo").unwrap();
+    assert!(!app.command_enabled(undo), "nothing to undo in a fresh document");
+    assert!(!app.command_enabled(redo), "nothing to redo in a fresh document");
+    let style = crate::content_ui::default_style();
+    app.views[0].content.draft = Some(crate::content_ui::TextDraft {
+        page: 0,
+        index: None,
+        rect: [20.0, 20.0, 120.0, 40.0],
+        text: "Typed text".into(),
+        style,
+        focus: false,
+        selection: None,
+        typing_from: None,
+    });
+    assert!(app.commit_typing_in(id), "the open text box commits");
+    assert!(app.views[0].content.draft.is_none(), "the box is closed once committed");
+    assert_eq!(app.session.get(id).unwrap().added().len(), 1, "the text was added");
+    assert!(app.command_enabled(undo), "a committed edit enables Undo");
+    assert!(!app.command_enabled(redo), "a fresh edit leaves Redo off");
+    app.undo();
+    assert_eq!(app.session.get(id).unwrap().added().len(), 0, "Undo takes the text back");
+    assert!(!app.command_enabled(undo), "Undo takes back the only edit");
+    assert!(app.command_enabled(redo), "Undo enables Redo");
+    app.redo();
+    assert_eq!(app.session.get(id).unwrap().added().len(), 1, "Redo puts the text back");
+    assert!(app.command_enabled(undo), "Redo restores Undo");
+    assert!(!app.command_enabled(redo), "Redo consumes the redo step");
+}
+
 #[test]
 fn save_commits_the_open_text_box() {
     let dir = staging_dir("open-text-box");
