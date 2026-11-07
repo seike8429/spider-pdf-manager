@@ -253,6 +253,9 @@ pub const COMMANDS: &[CommandSpec] = &[
         Nothing,
         "panel-left",
     ),
+    // The Inspector (properties of the current selection) opens itself when something is
+    // selected; this toggles whether it may.
+    c("view.inspector", "Show or hide the Inspector", VIEW, None, Nothing, "sliders-horizontal"),
     c("ui.dock.reset", "Reset side panels", VIEW, None, Nothing, "settings"),
     c("view.theme", "Switch light / dark theme", None, None, Nothing, "moon"),
     c("view.theme.system", "Use system setting", None, None, Nothing, "settings"),

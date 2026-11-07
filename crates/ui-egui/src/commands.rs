@@ -266,6 +266,11 @@ impl PdfCraftApp {
             "view.hand_tool" => self.quick_tool = crate::QuickTool::Hand,
             "view.side_panel" => self.toggle_side_panel(),
             "view.tools_pane" => self.left_open = !self.left_open,
+            // The Inspector opens itself when something is selected; this toggles whether it
+            // may. Dismissing it hides it; undismissing lets the next selection open it again.
+            "view.inspector" => {
+                self.inspector_dismissed = self.inspector_open();
+            }
             "view.focus_page_input" => {
                 if let (Some(ctx), Some(view)) = (self.ctx.clone(), active.and_then(|i| self.views.get_mut(i))) {
                     // The page box in the toolbar (chrome.rs); select its label so typing replaces it.

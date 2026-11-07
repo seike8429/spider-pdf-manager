@@ -156,6 +156,48 @@ enum SelectionAction {
     Copy,
 }
 
+/// Actions on the selected annotation, floating next to it: colour, delete, properties.
+/// `None` when no comment is selected, or the selected comment is not on screen.
+pub(super) fn annotation_actions(
+    ui: &mut egui::Ui,
+    viewport: Rect,
+    view: &mut DocView,
+    info: &DocInfo,
+    allowed: bool,
+) -> Option<comments::CanvasAction> {
+    if ui.input(|input| input.pointer.is_decidedly_dragging()) {
+        return None;
+    }
+    let (page, index) = view.comments.selected?;
+    let a = info.annotations.iter().find(|a| a.page == page && a.index == index)?;
+    let xf = view.page_xform(page)?;
+    let rotation = (view.rotation % 360 + info.pages.get(page).map_or(0, |p| p.rotation % 360)) % 360;
+    let rect = xf.user_rect(info, page, a.shown_rect(rotation));
+    if !viewport.intersects(rect) {
+        return None;
+    }
+    let x = rect.left().clamp(viewport.left() + 8.0, (viewport.right() - 260.0).max(viewport.left() + 8.0));
+    let y = if rect.bottom() + 48.0 < viewport.bottom() { rect.bottom() + 6.0 } else { (rect.top() - 44.0).max(viewport.top() + 6.0) };
+    let mut chosen = None;
+    egui::Area::new(egui::Id::unique(("annotation-actions", view.id.0))).order(egui::Order::Foreground).fixed_pos(pos2(x, y)).show(ui.ctx(), |ui| {
+        egui::Frame::popup(ui.style()).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                let current = a.color.map(|c| c.map(f64::from)).unwrap_or([1.0, 1.0, 0.0]);
+                if let Some(c) = comments::quick_bar_colour(ui, current) {
+                    chosen = Some(comments::CanvasAction::Colour(c));
+                }
+                if ui.add_enabled(allowed, egui::Button::new(tl!("Delete"))).clicked() {
+                    chosen = comments::delete_selected(&mut view.comments).map(|e| comments::CanvasAction::Edit(Box::new(e)));
+                }
+                if ui.button(tl!("Properties…")).clicked() {
+                    chosen = Some(comments::CanvasAction::Properties(page, index));
+                }
+            });
+        });
+    });
+    chosen
+}
+
 /// Actions on an existing text selection, next to the selected words.
 pub(super) fn selection_actions(
     ui: &mut egui::Ui,

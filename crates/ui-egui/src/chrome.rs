@@ -5,7 +5,7 @@ use egui::{Align, Color32, CornerRadius, Layout, Rect, Sense, Stroke, vec2};
 
 use crate::canvas::{DocView, Fit, PageLayout};
 use crate::theme::{self, ThemePreference, Tokens};
-use crate::{Dialog, Mode, PdfCraftApp, PropsTab, RightPanel, icons, widgets, window_controls};
+use crate::{Dialog, PdfCraftApp, PropsTab, RightPanel, icons, widgets, window_controls};
 
 /// Height of the tab strip when it doubles as the macOS title bar (#789). AppKit draws the traffic
 /// lights itself, centred in the standard 28 pt title-bar band at the top of the window, and moving
@@ -69,8 +69,9 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     app.active = None;
                     app.combine_tab.focused = false;
                 }
-                // Reserve the three icon buttons and their gaps outside the scrolling tabs.
-                let controls_width = 3.0 * button + 54.0 + window_controls::width(&controls.right);
+                // Reserve the right side outside the scrolling tabs: the three icon buttons and
+                // their gaps, the top bar's document controls, and the window controls.
+                let controls_width = 3.0 * button + 54.0 + TOP_BAR_DOC_WIDTH + 4.0 + window_controls::width(&controls.right);
                 // Open stays in sight after the tabs: its icon, text and padding, and the gaps around it.
                 let open_width = ui.fonts_mut(|f| f.layout_no_wrap(tl!("Open").into(), theme::medium(13.0), t.text).size().x) + 38.0 + 12.0;
                 let mut tabs_width = (ui.available_width() - controls_width - open_width).max(0.0);
@@ -154,10 +155,18 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                                     response.scroll_to_me(Some(Align::Center));
                                 }
                                 let id = app.views[i].id;
+                                // A tab being renamed keeps its rect for the editor below the strip.
+                                if app.tab_rename.as_ref().is_some_and(|(rid, _)| *rid == id) {
+                                    ui.data_mut(|d| d.insert_temp(egui::Id::unique("tab-rename-rect"), response.rect));
+                                }
                                 let reveal = cfg!(not(target_arch = "wasm32")) && doc.path.is_some();
                                 response.context_menu(|ui| {
                                     if ui.button(tl!("Close Tab")).clicked() {
                                         action = Some(crate::tab_context::Action::Close(id));
+                                        ui.close();
+                                    }
+                                    if ui.button(tl!("Rename")).clicked() {
+                                        app.tab_rename = Some((id, name.clone()));
                                         ui.close();
                                     }
                                     if ui.add_enabled(!app.closed_tabs.is_empty(), egui::Button::new(tl!("Reopen Closed Tab"))).clicked() {
@@ -172,6 +181,10 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                                 });
                                 if response.clicked() {
                                     app.active = Some(i);
+                                }
+                                // A double-click renames the tab inline, as in browsers.
+                                if response.double_clicked() {
+                                    app.tab_rename = Some((id, name.clone()));
                                 }
                                 // A middle click closes the tab, as in Acrobat and browsers (#1853);
                                 // unsaved changes ask first, as the close button does.
@@ -261,6 +274,39 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         }
                     }
                 });
+                // A tab being renamed: its name as an editable field over the tab. Enter commits,
+                // Escape cancels, as the Bookmarks panel's rename does.
+                let mut renaming = app.tab_rename.take();
+                if let Some((id, draft)) = renaming.as_mut() {
+                    let rect_id = egui::Id::unique("tab-rename-rect");
+                    let mut done = false;
+                    if let Some(rect) = ui.data(|d| d.get_temp::<Rect>(rect_id)) {
+                        // Over the tab's label: inside the icon on the left and the close button
+                        // on the right.
+                        let edit_rect = Rect::from_min_max(rect.min + vec2(28.0, 4.0), rect.max - vec2(24.0, 4.0));
+                        let edit = crate::widgets::line(draft).id(rect_id.with("edit"));
+                        let resp = ui.put(edit_rect, edit);
+                        if !resp.has_focus() && !resp.lost_focus() {
+                            resp.request_focus();
+                        }
+                        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                            done = true;
+                        } else if resp.lost_focus() {
+                            done = true;
+                            match validate_rename(draft) {
+                                Ok(name) => {
+                                    if app.session.get(*id).map(|d| d.name.as_str()) != Some(name.as_str()) {
+                                        app.session.rename(*id, name);
+                                    }
+                                }
+                                Err(why) => app.notify(why),
+                            }
+                        }
+                    }
+                    if !done {
+                        app.tab_rename = renaming;
+                    }
+                }
                 if overflow && arrow(ui, "chevron-right", offset < max_offset - 0.5, tl!("Scroll tabs right")) {
                     scroll_to = Some((offset + TAB_MIN_WIDTH + gap).min(max_offset));
                 }
@@ -306,9 +352,164 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     if icons::button(ui, "circle-help", button, false, tl!("Keyboard shortcuts")).clicked() {
                         app.dialog = Some(Dialog::Shortcuts);
                     }
+                    // The document controls, left of the strip's own buttons: a fixed-width
+                    // left-to-right cluster, so the tabs' reserve above stays exact.
+                    ui.allocate_ui_with_layout(vec2(TOP_BAR_DOC_WIDTH, button), Layout::left_to_right(Align::Center), |ui| {
+                        top_bar_document_controls(app, ui, button);
+                    });
                 });
             });
         });
+}
+
+/// Width of the tab strip's document controls (save status, Export, zoom, Undo/Redo, Save,
+/// Print, Properties) and the gaps between them: the tabs' reserve counts on it.
+const TOP_BAR_DOC_WIDTH: f32 = 412.0;
+/// Width of the top bar's zoom combo box: room for "Fit to width".
+const TOP_BAR_ZOOM_WIDTH: f32 = 96.0;
+/// Width of the save-status label: room for "Unsaved".
+const TOP_BAR_STATUS_WIDTH: f32 = 64.0;
+/// The top bar zoom menu's percentages.
+const ZOOM_PRESETS: [f32; 7] = [50.0, 75.0, 100.0, 125.0, 150.0, 200.0, 400.0];
+/// The Export menu: the File ▸ Export commands, in the same order.
+const TOP_BAR_EXPORT: &[&str] = &["export.image", "export.text", "export.all_images", "export.docx", "export.pptx", "export.html", "export.rtf"];
+
+/// The tab strip's document controls: save status, Export, zoom, Undo/Redo, Save, Print and
+/// Document properties (moved here from the mode bar). Greyed out with no document open.
+fn top_bar_document_controls(app: &mut PdfCraftApp, ui: &mut egui::Ui, button: f32) {
+    let t = Tokens::get(ui.ctx());
+    // The 412 px reserve counts on 4 px gaps.
+    ui.spacing_mut().item_spacing.x = 4.0;
+    let has_doc = app.active.is_some();
+    // Save status: Saved, or Unsaved when the active document is dirty.
+    let dirty = app.active_ids().and_then(|(_, id)| app.session.get(id)).is_some_and(|d| d.dirty);
+    let (status, color) = if dirty { (tl!("Unsaved"), t.accent) } else { (tl!("Saved"), t.text_muted) };
+    ui.add_sized(
+        vec2(TOP_BAR_STATUS_WIDTH, button),
+        egui::Label::new(egui::RichText::new(status).font(theme::regular(12.0)).color(color)).truncate(),
+    )
+    .on_hover_text(if dirty { tl!("Unsaved changes") } else { tl!("All changes saved") });
+    // Export menu.
+    let mut export_pick = None;
+    let export_resp = ui.add_enabled_ui(has_doc, |ui| ui.button(tl!("Export"))).inner;
+    egui::Popup::menu(&export_resp).show(|ui| {
+        for id in TOP_BAR_EXPORT {
+            let Some(spec) = pdfcraft_engine::commands::command(id) else { continue };
+            if ui.button(tl!(spec.label)).clicked() {
+                export_pick = Some(id);
+                ui.close();
+            }
+        }
+    });
+    if let Some(id) = export_pick {
+        app.run_command(id);
+    }
+    // Zoom combo box with the standard presets and the two fits.
+    let mut zoom_pick = None;
+    if let Some(index) = app.active {
+        let view = &app.views[index];
+        let label = zoom_label(view.zoom, view.fit);
+        craft_ui::ComboBox::from_id_salt("top-bar-zoom").selected_text(label).width(TOP_BAR_ZOOM_WIDTH).show_ui(ui, |ui| {
+            for pct in ZOOM_PRESETS {
+                let current = view.fit == Fit::None && (view.zoom * 100.0 - pct).abs() < 0.5;
+                if ui.selectable_label(current, format!("{pct:.0}%")).clicked() {
+                    zoom_pick = Some(ZoomPick::Percent(pct / 100.0));
+                }
+            }
+            ui.separator();
+            if ui.selectable_label(view.fit == Fit::Width, tl!("Fit to width")).clicked() {
+                zoom_pick = Some(ZoomPick::Fit(Fit::Width));
+            }
+            if ui.selectable_label(view.fit == Fit::Page, tl!("Fit to page")).clicked() {
+                zoom_pick = Some(ZoomPick::Fit(Fit::Page));
+            }
+        });
+    } else {
+        ui.add_enabled_ui(false, |ui| {
+            craft_ui::ComboBox::from_id_salt("top-bar-zoom").selected_text("—").width(TOP_BAR_ZOOM_WIDTH).show_ui(ui, |_| {});
+        });
+    }
+    if let Some(pick) = zoom_pick
+        && let Some(index) = app.active
+    {
+        match pick {
+            ZoomPick::Percent(zoom) => app.views[index].set_zoom(zoom),
+            ZoomPick::Fit(fit) => app.views[index].set_fit(fit),
+        }
+    }
+    // Undo / Redo as clickable buttons, as in the toolbar (v1.1), greyed out when there is
+    // nothing to undo or redo.
+    for id in ["edit.undo", "edit.redo"] {
+        let Some(spec) = pdfcraft_engine::commands::command(id) else { continue };
+        let shortcut = crate::commands::command_shortcut_label(ui.ctx(), spec.id);
+        let tip = if shortcut.is_empty() { tl!(spec.label).to_owned() } else { format!("{} ({shortcut})", tl!(spec.label)) };
+        let resp = ui.add_enabled_ui(app.command_enabled(spec), |ui| icons::button(ui, spec.icon, button, false, &tip)).inner;
+        if resp.clicked() {
+            app.execute(spec.id);
+        }
+    }
+    ui.add_enabled_ui(has_doc, |ui| {
+        let tip = crate::commands::command_tip(ui.ctx(), tl!("Save ({key})"), "file.save");
+        if icons::button(ui, "save", button, false, &tip).clicked() {
+            app.run_command("file.save");
+        }
+        let tip = crate::commands::command_tip(ui.ctx(), tl!("Print ({key})"), "print.dialog");
+        // A document that forbids printing says so here, before the dialog (#2669).
+        let may_print = !has_doc || pdfcraft_engine::commands::command("print.dialog").is_some_and(|c| app.command_enabled(c));
+        let mut print = ui.add_enabled_ui(may_print, |ui| icons::button(ui, "printer", button, false, &tip)).inner;
+        if !may_print {
+            print = print.on_disabled_hover_text(crate::print_refused());
+        }
+        if print.clicked() {
+            app.run_command("print.dialog");
+        }
+        let tip = crate::commands::command_tip(ui.ctx(), tl!("Document properties ({key})"), "file.properties");
+        if icons::button(ui, "info", button, false, &tip).clicked() {
+            app.dialog = Some(Dialog::Properties(PropsTab::Description));
+        }
+    });
+}
+
+/// What the top bar's zoom menu picked: a percentage, or a fit.
+enum ZoomPick {
+    Percent(f32),
+    Fit(Fit),
+}
+
+/// The zoom the top bar's combo box shows: the fit mode, or the zoom as a percentage.
+pub(crate) fn zoom_label(zoom: f32, fit: Fit) -> String {
+    match fit {
+        Fit::Width => tl!("Fit to width").to_string(),
+        Fit::Page => tl!("Fit to page").to_string(),
+        Fit::Height => tl!("Fit to height").to_string(),
+        Fit::None => format!("{:.0}%", zoom * 100.0),
+    }
+}
+
+/// The longest a renamed document name may be, in characters.
+const RENAME_MAX_CHARS: usize = 200;
+
+/// A renamed document name, trimmed, or why it can't be one. A display name only: it must
+/// never reach the file system (see [`pdfcraft_engine::Session::rename`]). A trailing space is
+/// trimmed away; a trailing dot is refused (Windows will not save such a name).
+pub(crate) fn validate_rename(name: &str) -> Result<String, &'static str> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("A name can't be empty");
+    }
+    if name == "." || name == ".." {
+        return Err("A name can't be \".\" or \"..\"");
+    }
+    if name.chars().any(|c| c == '/' || c == '\\' || c.is_control()) {
+        return Err("A name can't contain / or \\");
+    }
+    if name.ends_with('.') {
+        return Err("A name can't end with a dot");
+    }
+    if name.chars().count() > RENAME_MAX_CHARS {
+        return Err("That name is too long");
+    }
+    Ok(name.to_string())
 }
 
 /// The right-click menu on the title bar's theme button.
@@ -487,35 +688,15 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 }
                 // Acrobat's mode bar has no Read tab: reading is what the viewer does with no tool
                 // in use. Read mode (the panes hidden) stays a View command and a default workspace.
-                for (mode, label) in [(Mode::AllTools, "All tools"), (Mode::Edit, "Edit"), (Mode::Convert, "Convert"), (Mode::Sign, "E-Sign")] {
+                // Convert stays a mode and a tool, but has no tab (see RIBBON_TABS).
+                for (mode, label) in crate::RIBBON_TABS.iter().copied() {
                     if widgets::mode_tab(ui, tl!(label), app.mode == mode).clicked() {
                         app.switch_mode(mode, true);
                     }
                 }
+                // Save, Print and Document properties moved to the tab strip (the top bar).
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.spacing_mut().item_spacing.x = 4.0;
-                    let has_doc = app.active.is_some();
-                    ui.add_enabled_ui(has_doc, |ui| {
-                        let tip = crate::commands::command_tip(ui.ctx(), tl!("Print ({key})"), "print.dialog");
-                        // A document that forbids printing says so here, before the dialog (#2669).
-                        let may_print = !has_doc || pdfcraft_engine::commands::command("print.dialog").is_some_and(|c| app.command_enabled(c));
-                        let mut print = ui.add_enabled_ui(may_print, |ui| icons::button(ui, "printer", 32.0, false, &tip)).inner;
-                        if !may_print {
-                            print = print.on_disabled_hover_text(crate::print_refused());
-                        }
-                        if print.clicked() {
-                            app.run_command("print.dialog");
-                        }
-                        let tip = crate::commands::command_tip(ui.ctx(), tl!("Save ({key})"), "file.save");
-                        if icons::button(ui, "save", 32.0, false, &tip).clicked() {
-                            app.run_command("file.save");
-                        }
-                        let tip = crate::commands::command_tip(ui.ctx(), tl!("Document properties ({key})"), "file.properties");
-                        if icons::button(ui, "info", 32.0, false, &tip).clicked() {
-                            app.dialog = Some(Dialog::Properties(PropsTab::Description));
-                        }
-                    });
-                    ui.add_space(8.0);
                     if widgets::search_box(ui, tl!("Find tools and commands"), 260.0).clicked() {
                         app.palette_open = true;
                     }
@@ -898,5 +1079,42 @@ mod tab_widths {
         assert_eq!(MAC_CONTENT_LEFT - lights_end, margin);
         // `egui::Margin` is in `i8`.
         assert!(MAC_CONTENT_LEFT <= f32::from(i8::MAX));
+    }
+}
+
+#[cfg(test)]
+mod top_bar_tests {
+    use super::{Fit, validate_rename, zoom_label};
+
+    /// A renamed name is trimmed, and must be a plain file name: no separators, no trailing
+    /// dot, not empty, not "." or "..", and not absurdly long. A trailing space is trimmed
+    /// away, not refused.
+    #[test]
+    fn rename_names_are_trimmed_plain_file_names() {
+        assert_eq!(validate_rename("  Report 2026  "), Ok("Report 2026".to_string()));
+        assert_eq!(validate_rename("report.pdf"), Ok("report.pdf".to_string()));
+        assert_eq!(validate_rename("ဗေဒင် chart"), Ok("ဗေဒင် chart".to_string()));
+        assert_eq!(validate_rename("report "), Ok("report".to_string()));
+        assert!(validate_rename("").is_err());
+        assert!(validate_rename("   ").is_err());
+        assert!(validate_rename("a/b").is_err());
+        assert!(validate_rename("a\\b").is_err());
+        assert!(validate_rename("a\tb").is_err());
+        assert!(validate_rename(".").is_err());
+        assert!(validate_rename("..").is_err());
+        assert!(validate_rename("report.").is_err());
+        assert!(validate_rename(&"x".repeat(201)).is_err());
+        assert!(validate_rename(&"x".repeat(200)).is_ok());
+    }
+
+    /// The zoom combo box shows the fit mode, or the zoom as a percentage.
+    #[test]
+    fn zoom_label_shows_the_fit_or_the_percentage() {
+        assert_eq!(zoom_label(1.0, Fit::None), "100%");
+        assert_eq!(zoom_label(0.5, Fit::None), "50%");
+        assert_eq!(zoom_label(1.25, Fit::None), "125%");
+        assert_eq!(zoom_label(2.0, Fit::Width), "Fit to width");
+        assert_eq!(zoom_label(2.0, Fit::Page), "Fit to page");
+        assert_eq!(zoom_label(2.0, Fit::Height), "Fit to height");
     }
 }

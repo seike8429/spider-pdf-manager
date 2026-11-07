@@ -295,6 +295,16 @@ impl Session {
         self.docs.retain(|d| d.id != id);
     }
 
+    /// Rename a document's display name (the tab and window title show it when the document has
+    /// no Title metadata). Session-only: it does not rename the file on disk and does not mark
+    /// the document dirty, so saving still writes to the file it came from. `false` when no open
+    /// document has this id.
+    pub fn rename(&mut self, id: DocId, name: String) -> bool {
+        let Some(doc) = self.docs.iter_mut().find(|d| d.id == id) else { return false };
+        doc.name = name;
+        true
+    }
+
     pub fn get(&self, id: DocId) -> Option<&Document> {
         self.docs.iter().find(|d| d.id == id)
     }

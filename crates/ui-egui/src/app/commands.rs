@@ -78,14 +78,22 @@ impl PdfCraftApp {
         self.enter_mode(mode);
         self.reveal_tools();
         if let Some(view) = self.active.and_then(|i| self.views.get_mut(i)) {
-            view.organize = false;
+            if mode == Mode::Organize {
+                view.open_organize();
+            } else {
+                view.organize = false;
+            }
         }
-        self.left = match mode {
-            Mode::Edit => LeftPanel::Tool("edit"),
-            Mode::Convert => LeftPanel::Tool("export"),
-            Mode::Sign => LeftPanel::Tool("fill_sign"),
-            _ => LeftPanel::AllTools,
-        };
+        self.left = mode_panel(mode);
+    }
+
+    /// Whether the Inspector pane shows this frame: a document open, not in Read mode, not
+    /// dismissed for this session, and something selected to inspect.
+    pub(crate) fn inspector_open(&self) -> bool {
+        self.active.is_some()
+            && self.mode != Mode::Read
+            && !self.inspector_dismissed
+            && crate::panels::inspector::kind(self) != crate::panels::inspector::InspectorKind::None
     }
 
     /// Changes the workspace and the tool that goes with it. The mode bar (through
@@ -191,5 +199,40 @@ impl PdfCraftApp {
     /// F4: closes the side panel, or reopens the one open last.
     pub(crate) fn toggle_side_panel(&mut self) {
         self.choose_right_panel(if self.right.is_some() { None } else { Some(self.last_right) });
+    }
+}
+
+/// The left panel a workspace opens with: each ribbon mode's own tool panel, All tools for the
+/// rest (Read has no panel of its own; All tools is its own).
+pub(crate) fn mode_panel(mode: Mode) -> LeftPanel {
+    match mode {
+        Mode::View => LeftPanel::Tool("view"),
+        Mode::Annotate => LeftPanel::Tool("comment"),
+        Mode::Edit => LeftPanel::Tool("edit"),
+        Mode::Forms => LeftPanel::Tool("form"),
+        Mode::Organize => LeftPanel::Tool("organize"),
+        Mode::Convert => LeftPanel::Tool("export"),
+        Mode::Sign => LeftPanel::Tool("fill_sign"),
+        _ => LeftPanel::AllTools,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::mode_panel;
+    use crate::{LeftPanel, Mode};
+
+    /// Every ribbon mode opens its own panel; the modes without one fall back to All tools.
+    #[test]
+    fn select_mode_mapping() {
+        assert_eq!(mode_panel(Mode::View), LeftPanel::Tool("view"));
+        assert_eq!(mode_panel(Mode::Annotate), LeftPanel::Tool("comment"));
+        assert_eq!(mode_panel(Mode::Edit), LeftPanel::Tool("edit"));
+        assert_eq!(mode_panel(Mode::Forms), LeftPanel::Tool("form"));
+        assert_eq!(mode_panel(Mode::Organize), LeftPanel::Tool("organize"));
+        assert_eq!(mode_panel(Mode::Convert), LeftPanel::Tool("export"));
+        assert_eq!(mode_panel(Mode::Sign), LeftPanel::Tool("fill_sign"));
+        assert_eq!(mode_panel(Mode::AllTools), LeftPanel::AllTools);
+        assert_eq!(mode_panel(Mode::Read), LeftPanel::AllTools);
     }
 }

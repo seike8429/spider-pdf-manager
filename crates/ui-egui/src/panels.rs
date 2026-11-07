@@ -13,6 +13,7 @@ mod bookmarks;
 pub(super) mod comments_panel;
 mod edit;
 pub(super) mod format_text_ui;
+pub(super) mod inspector;
 pub(super) mod organize_panel;
 pub(super) mod page_selection_ui;
 mod pages;
@@ -20,6 +21,7 @@ mod right;
 pub(super) mod search_ui;
 pub mod side_panels;
 mod tools;
+pub(super) mod view_panel;
 
 pub use bookmarks::BmAction;
 pub(crate) use bookmarks::ellipsized_prefix;

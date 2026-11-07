@@ -7,8 +7,16 @@ pub enum Mode {
     #[serde(rename = "all")]
     AllTools,
     Read,
+    /// The View workspace: page display, zoom and appearance in the left panel.
+    View,
+    /// The Annotate workspace: the comment tools in the left panel.
+    Annotate,
     Edit,
     Convert,
+    /// The Forms workspace: Prepare a form in the left panel.
+    Forms,
+    /// The Organize workspace: the page grid, with its panel in the left panel.
+    Organize,
     Sign,
 }
 
@@ -17,13 +25,29 @@ impl Mode {
         match value {
             "all" => Some(Self::AllTools),
             "read" => Some(Self::Read),
+            "view" => Some(Self::View),
+            "annotate" => Some(Self::Annotate),
             "edit" => Some(Self::Edit),
             "convert" => Some(Self::Convert),
+            "forms" => Some(Self::Forms),
+            "organize" => Some(Self::Organize),
             "sign" => Some(Self::Sign),
             _ => None,
         }
     }
 }
+
+/// The mode bar's tabs, in order: every workspace with a left panel of its own. Convert stays
+/// a mode (and a tool, Export), but has no tab of its own, as in the v1.1 bar.
+pub const RIBBON_TABS: &[(Mode, &str)] = &[
+    (Mode::AllTools, "All tools"),
+    (Mode::View, "View"),
+    (Mode::Annotate, "Annotate"),
+    (Mode::Edit, "Edit"),
+    (Mode::Forms, "Forms"),
+    (Mode::Organize, "Organize"),
+    (Mode::Sign, "E-Sign"),
+];
 
 /// What the left panel shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -449,4 +473,44 @@ pub enum OpenOutcome {
     Pending,
     /// The file could not be read or opened; the user was told.
     Failed,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Mode, RIBBON_TABS};
+
+    /// Every mode survives a serialize-then-parse round trip, and unknown strings parse to
+    /// nothing (a saved default mode from a newer version degrades to the default, not a crash).
+    #[test]
+    fn mode_parse_round_trips() {
+        for mode in [Mode::AllTools, Mode::Read, Mode::View, Mode::Annotate, Mode::Edit, Mode::Convert, Mode::Forms, Mode::Organize, Mode::Sign] {
+            let value = serde_json::to_value(mode).expect("a mode serializes");
+            let name = value.as_str().expect("a mode serializes as a string");
+            assert_eq!(Mode::parse(name), Some(mode), "{name} parses back to {mode:?}");
+            let back: Mode = serde_json::from_value(value).expect("a mode deserializes");
+            assert_eq!(back, mode);
+        }
+        assert_eq!(Mode::parse("bogus"), None);
+        assert_eq!(Mode::parse(""), None);
+    }
+
+    /// The mode bar's tabs, in order, with Convert deliberately absent (it stays a mode and a
+    /// tool, but has no tab).
+    #[test]
+    fn ribbon_tabs_are_ordered_and_convert_has_no_tab() {
+        assert_eq!(
+            RIBBON_TABS,
+            &[
+                (Mode::AllTools, "All tools"),
+                (Mode::View, "View"),
+                (Mode::Annotate, "Annotate"),
+                (Mode::Edit, "Edit"),
+                (Mode::Forms, "Forms"),
+                (Mode::Organize, "Organize"),
+                (Mode::Sign, "E-Sign"),
+            ]
+        );
+        assert!(!RIBBON_TABS.iter().any(|(m, _)| *m == Mode::Convert));
+        assert!(!RIBBON_TABS.iter().any(|(m, _)| *m == Mode::Read));
+    }
 }

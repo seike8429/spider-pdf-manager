@@ -23,6 +23,8 @@ pub fn left_panel(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
             // Organize pages has its own panel whenever the grid shows (with a document open).
             _ if app.active.is_some() && crate::organize_panel::showing(app) => crate::organize_panel::panel(app, ui, &t),
             LeftPanel::AllTools => all_tools(app, ui, &t),
+            // The View workspace has its own panel, not a catalogue group.
+            LeftPanel::Tool("view") => super::view_panel::panel(app, ui, &t),
             LeftPanel::Tool(id) => match catalog::group(id) {
                 Some(g) => tool_detail(app, ui, &t, g),
                 None => app.left = LeftPanel::AllTools,

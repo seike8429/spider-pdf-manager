@@ -1,9 +1,10 @@
 //! The side panels around the page: the Tools pane, the rail and the open side panel
 //! ([`crate::RightPanel`]), drawn with craft-ui task panes ([`craft_ui::panes`]).
 //!
-//! On the right, outermost first: the rail, the Tools pane when Preferences ▸ Tools panel side is
-//! Right, then the side panel, then the page. Panes are docked only; their widths are resizable
-//! and saved with the preferences.
+//! Outermost first on the rail's edge: the rail, the Tools pane when Preferences ▸ Tools panel
+//! side is on that edge, then the side panel, then the page. The Inspector docks on the
+//! opposite edge. Panes are docked only; their widths are resizable and saved with the
+//! preferences.
 
 use std::ops::RangeInclusive;
 
@@ -27,12 +28,14 @@ const VERSION: u64 = 1;
 /// Deepest split tree the old layout migration walks; the old renderer allowed far fewer.
 const MAX_DEPTH: usize = 32;
 
-/// The two panes [`PaneHost`] draws.
+/// The panes [`PaneHost`] draws: the Tools pane, the side panel and the Inspector.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Pane {
     Tools,
     /// The open [`crate::RightPanel`].
     Side,
+    /// The Inspector: properties of the current selection.
+    Inspector,
 }
 
 impl Pane {
@@ -40,6 +43,7 @@ impl Pane {
         match id {
             "tools" => Some(Self::Tools),
             "side" => Some(Self::Side),
+            "inspector" => Some(Self::Inspector),
             _ => None,
         }
     }
@@ -47,7 +51,7 @@ impl Pane {
     fn range(self) -> RangeInclusive<f32> {
         match self {
             Self::Tools => TOOLS_RANGE,
-            Self::Side => SIDE_RANGE,
+            Self::Side | Self::Inspector => SIDE_RANGE,
         }
     }
 }
@@ -71,11 +75,18 @@ pub struct SidePanels {
     pub rail_side: ToolsSide,
     pub tools_width: f32,
     pub side_width: f32,
+    pub inspector_width: f32,
 }
 
 impl Default for SidePanels {
     fn default() -> Self {
-        Self { tools_side: ToolsSide::Left, rail_side: ToolsSide::Right, tools_width: TOOLS_WIDTH, side_width: SIDE_WIDTH }
+        Self {
+            tools_side: ToolsSide::Left,
+            rail_side: ToolsSide::Left,
+            tools_width: TOOLS_WIDTH,
+            side_width: SIDE_WIDTH,
+            inspector_width: SIDE_WIDTH,
+        }
     }
 }
 
@@ -120,10 +131,20 @@ impl SidePanels {
         }
     }
 
+    /// The edge the Inspector docks on: opposite the navigation rail, so the selection's
+    /// properties sit across the page from the navigation panels.
+    pub fn inspector_edge(&self) -> Edge {
+        match self.rail_side {
+            ToolsSide::Left => Edge::End,
+            ToolsSide::Right => Edge::Start,
+        }
+    }
+
     pub fn width(&self, pane: Pane) -> f32 {
         match pane {
             Pane::Tools => self.tools_width,
             Pane::Side => self.side_width,
+            Pane::Inspector => self.inspector_width,
         }
     }
 
@@ -132,6 +153,7 @@ impl SidePanels {
         match pane {
             Pane::Tools => self.tools_width = width,
             Pane::Side => self.side_width = width,
+            Pane::Inspector => self.inspector_width = width,
         }
     }
 
@@ -144,6 +166,7 @@ impl SidePanels {
             "tools_open": tools_open,
             "tools_width": self.tools_width,
             "side_width": self.side_width,
+            "inspector_width": self.inspector_width,
         })
     }
 }
@@ -169,6 +192,9 @@ pub fn restore(saved: &Value) -> Restored {
         }
         if let Some(width) = value.get("side_width").and_then(Value::as_f64).and_then(|w| clamp_width(Pane::Side, w)) {
             panels.side_width = width;
+        }
+        if let Some(width) = value.get("inspector_width").and_then(Value::as_f64).and_then(|w| clamp_width(Pane::Inspector, w)) {
+            panels.inspector_width = width;
         }
         return Restored { panels, tools_open: value.get("tools_open").and_then(Value::as_bool), side_closed: false };
     }
@@ -294,6 +320,8 @@ pub fn state(app: &PdfCraftApp) -> Value {
         "side_open": app.right.is_some(),
         "side_panel": app.right.map(|r| format!("{r:?}")),
         "side_width": panels.side_width,
+        "inspector_open": app.inspector_open(),
+        "inspector_width": panels.inspector_width,
     })
 }
 
@@ -304,8 +332,8 @@ pub fn command(app: &mut PdfCraftApp, reset: bool, params: &Value) -> Result<Val
         app.left_open = true;
         return Ok(json!({ "side_panels": state(app) }));
     }
-    let pane = Pane::parse(params.get("panel").and_then(Value::as_str).ok_or("panel must be \"tools\" or \"side\"")?)
-        .ok_or("panel must be \"tools\" or \"side\"")?;
+    let pane = Pane::parse(params.get("panel").and_then(Value::as_str).ok_or("panel must be \"tools\", \"side\" or \"inspector\"")?)
+        .ok_or("panel must be \"tools\", \"side\" or \"inspector\"")?;
     let open = match params.get("open") {
         None | Some(Value::Null) => None,
         Some(value) => Some(value.as_bool().ok_or("open must be a boolean")?),
@@ -321,6 +349,8 @@ pub fn command(app: &mut PdfCraftApp, reset: bool, params: &Value) -> Result<Val
         (Pane::Tools, Some(open)) => app.left_open = open,
         (Pane::Side, Some(true)) if app.right.is_none() => app.toggle_side_panel(),
         (Pane::Side, Some(false)) if app.right.is_some() => app.choose_right_panel(None),
+        // Opening the Inspector undoes a dismissal; closing it dismisses it for the session.
+        (Pane::Inspector, Some(open)) => app.inspector_dismissed = !open,
         _ => {}
     }
     Ok(json!({ "side_panels": state(app) }))
@@ -334,7 +364,9 @@ impl PaneContent<Pane> for Content<'_> {
     fn title(&self, pane: &Pane) -> String {
         crate::i18n::t(match pane {
             Pane::Tools => "Tools",
-            Pane::Side => "Inspector",
+            // The old layout called this pane "inspector"; it holds the side panels now.
+            Pane::Side => "Side panel",
+            Pane::Inspector => "Inspector",
         })
         .to_owned()
     }
@@ -346,6 +378,7 @@ impl PaneContent<Pane> for Content<'_> {
                 ui.data_mut(|data| data.insert_temp(egui::Id::unique("pdfcraft-inspector-body"), ui.max_rect()));
                 crate::panels::right_panel(self.app, ui);
             }
+            Pane::Inspector => crate::panels::inspector::panel(self.app, ui),
         }
     }
 
@@ -372,6 +405,7 @@ fn state_of(panels: &SidePanels, pane: Pane) -> PaneState {
     let edge = match pane {
         Pane::Tools => panels.tools_edge(),
         Pane::Side => panels.rail_edge(),
+        Pane::Inspector => panels.inspector_edge(),
     };
     PaneState::docked(edge, panels.width(pane))
 }
@@ -386,6 +420,10 @@ fn open_panes(app: &PdfCraftApp) -> Vec<Pane> {
     // Home and Combine files have no side panel; the choice is kept for the next document.
     if app.active.is_some() && app.right.is_some() {
         open.push(Pane::Side);
+    }
+    // The Inspector opens itself when something is selected, unless dismissed for the session.
+    if app.inspector_open() {
+        open.push(Pane::Inspector);
     }
     open
 }
@@ -420,7 +458,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     if let Some(panel) = app.right {
         app.last_right = panel;
     }
-    // The rail first: it is the outermost panel on the right.
+    // The rail first: it is the outermost panel on its edge.
     if app.active.is_some() {
         crate::chrome::right_rail(app, ui);
     }
@@ -451,6 +489,9 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
             PaneRequest::Resize(pane, width) => app.side_panels.set_width(pane, width),
             PaneRequest::Close(Pane::Tools) => app.left_open = false,
             PaneRequest::Close(Pane::Side) => app.choose_right_panel(None),
+            // Closing the Inspector dismisses it for the session, so a new selection does not
+            // reopen it until the user asks for it again.
+            PaneRequest::Close(Pane::Inspector) => app.inspector_dismissed = true,
             _ => {}
         }
     }
@@ -484,7 +525,16 @@ mod tests {
     #[test]
     fn docked_default_keeps_widths() {
         let restored = restore(&docked(300.0, 400.0));
-        assert_eq!(restored.panels, SidePanels { tools_side: ToolsSide::Left, rail_side: ToolsSide::Right, tools_width: 300.0, side_width: 400.0 });
+        assert_eq!(
+            restored.panels,
+            SidePanels {
+                tools_side: ToolsSide::Left,
+                rail_side: ToolsSide::Left,
+                tools_width: 300.0,
+                side_width: 400.0,
+                inspector_width: SIDE_WIDTH
+            }
+        );
         assert_eq!((restored.tools_open, restored.side_closed), (Some(true), false));
     }
 
@@ -498,7 +548,7 @@ mod tests {
         );
         let restored = restore(&old);
         assert_eq!(restored.panels.tools_side, ToolsSide::Right);
-        assert_eq!(restored.panels.rail_side, ToolsSide::Right);
+        assert_eq!(restored.panels.rail_side, ToolsSide::Left);
         assert_eq!(restored.panels.tools_width, 290.0);
         // The Inspector's own split fixes Tools' width, not its.
         assert_eq!(restored.panels.side_width, SIDE_WIDTH);
@@ -514,7 +564,13 @@ mod tests {
         let restored = restore(&old);
         assert_eq!(
             restored.panels,
-            SidePanels { tools_side: ToolsSide::Left, rail_side: ToolsSide::Right, tools_width: TOOLS_WIDTH, side_width: 360.0 }
+            SidePanels {
+                tools_side: ToolsSide::Left,
+                rail_side: ToolsSide::Left,
+                tools_width: TOOLS_WIDTH,
+                side_width: 360.0,
+                inspector_width: SIDE_WIDTH
+            }
         );
         assert_eq!((restored.tools_open, restored.side_closed), (Some(true), false));
     }
@@ -524,7 +580,7 @@ mod tests {
         let old = workspace(split(json!({"FixedSecond": 350.0}), tabs(&["canvas"]), tabs(&["inspector", "tools"])), json!([]), json!([]));
         let restored = restore(&old);
         assert_eq!(restored.panels.tools_side, ToolsSide::Left);
-        assert_eq!(restored.panels.rail_side, ToolsSide::Right);
+        assert_eq!(restored.panels.rail_side, ToolsSide::Left);
         assert_eq!((restored.panels.tools_width, restored.panels.side_width), (TOOLS_WIDTH, SIDE_WIDTH));
         assert_eq!((restored.tools_open, restored.side_closed), (Some(true), false));
     }
@@ -540,7 +596,16 @@ mod tests {
             ]),
         );
         let restored = restore(&old);
-        assert_eq!(restored.panels, SidePanels { tools_side: ToolsSide::Right, rail_side: ToolsSide::Right, tools_width: 300.0, side_width: 380.0 });
+        assert_eq!(
+            restored.panels,
+            SidePanels {
+                tools_side: ToolsSide::Right,
+                rail_side: ToolsSide::Left,
+                tools_width: 300.0,
+                side_width: 380.0,
+                inspector_width: SIDE_WIDTH
+            }
+        );
         assert_eq!((restored.tools_open, restored.side_closed), (Some(false), true));
     }
 
@@ -561,7 +626,13 @@ mod tests {
         let restored = restore(&json!({"side_panels": {"version": 1, "tools_side": "up", "tools_width": 9000.0, "side_width": "x"}}));
         assert_eq!(
             restored.panels,
-            SidePanels { tools_side: ToolsSide::Left, rail_side: ToolsSide::Right, tools_width: 520.0, side_width: SIDE_WIDTH }
+            SidePanels {
+                tools_side: ToolsSide::Left,
+                rail_side: ToolsSide::Left,
+                tools_width: 520.0,
+                side_width: SIDE_WIDTH,
+                inspector_width: SIDE_WIDTH
+            }
         );
         // Deep trees are cut off rather than walked.
         let mut deep = tabs(&["tools"]);
@@ -573,7 +644,8 @@ mod tests {
 
     #[test]
     fn saved_value_round_trips() {
-        let panels = SidePanels { tools_side: ToolsSide::Right, rail_side: ToolsSide::Left, tools_width: 300.0, side_width: 410.0 };
+        let panels =
+            SidePanels { tools_side: ToolsSide::Right, rail_side: ToolsSide::Left, tools_width: 300.0, side_width: 410.0, inspector_width: 360.0 };
         let restored = restore(&json!({ "side_panels": panels.to_json(false) }));
         assert_eq!(restored, Restored { panels, tools_open: Some(false), side_closed: false });
     }
@@ -581,11 +653,30 @@ mod tests {
     #[test]
     fn rail_side_placement_and_restore() {
         let mut panels = SidePanels::default();
-        assert_eq!(panels.rail_side, ToolsSide::Right);
-        assert_eq!(panels.rail_edge(), Edge::End);
-        panels.rail_side = ToolsSide::Left;
+        // The navigation rail docks on the left by default.
+        assert_eq!(panels.rail_side, ToolsSide::Left);
         assert_eq!(panels.rail_edge(), Edge::Start);
-        let restored = restore(&json!({"side_panels": {"version": 1, "rail_side": "left"}}));
-        assert_eq!(restored.panels.rail_side, ToolsSide::Left);
+        panels.rail_side = ToolsSide::Right;
+        assert_eq!(panels.rail_edge(), Edge::End);
+        let restored = restore(&json!({"side_panels": {"version": 1, "rail_side": "right"}}));
+        assert_eq!(restored.panels.rail_side, ToolsSide::Right);
+        // The Inspector docks on the opposite edge from the rail.
+        assert_eq!(panels.inspector_edge(), Edge::Start);
+        panels.rail_side = ToolsSide::Left;
+        assert_eq!(panels.inspector_edge(), Edge::End);
+    }
+
+    #[test]
+    fn inspector_pane_parses_and_keeps_its_width() {
+        assert_eq!(Pane::parse("inspector"), Some(Pane::Inspector));
+        assert_eq!(Pane::parse("side"), Some(Pane::Side));
+        assert_eq!(Pane::parse("tools"), Some(Pane::Tools));
+        assert_eq!(Pane::parse("bogus"), None);
+        let panels = SidePanels { inspector_width: 360.0, ..SidePanels::default() };
+        let restored = restore(&json!({ "side_panels": panels.to_json(false) }));
+        assert_eq!(restored.panels.inspector_width, 360.0);
+        // A saved value without an inspector width keeps the default.
+        let restored = restore(&json!({"side_panels": {"version": 1, "side_width": 400.0}}));
+        assert_eq!(restored.panels.inspector_width, SIDE_WIDTH);
     }
 }

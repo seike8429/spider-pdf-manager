@@ -25,9 +25,13 @@ pub(crate) fn showing(app: &PdfCraftApp) -> bool {
 /// tab, as Acrobat goes back to the tool you came from, and All tools otherwise.
 pub(crate) fn workspace_panel(mode: crate::Mode) -> LeftPanel {
     match mode {
+        crate::Mode::View => LeftPanel::Tool("view"),
+        crate::Mode::Annotate => LeftPanel::Tool("comment"),
         crate::Mode::Edit => LeftPanel::Tool("edit"),
+        crate::Mode::Forms => LeftPanel::Tool("form"),
         crate::Mode::Convert => LeftPanel::Tool("export"),
         crate::Mode::Sign => LeftPanel::Tool("fill_sign"),
+        // Organize closed from its own workspace goes back to All tools, not to its own panel.
         _ => LeftPanel::AllTools,
     }
 }

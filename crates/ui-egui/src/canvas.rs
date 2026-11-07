@@ -65,7 +65,7 @@ use organize::organize_grid;
 use organize::sharp_enough;
 pub(crate) use page_input::PageToolContext;
 use page_input::{PageInput, cancel_on_escape, page_overlays, page_tool_input, text_layer};
-use selection::{Selection, Span, click_unit, selection_actions};
+use selection::{Selection, Span, annotation_actions, click_unit, selection_actions};
 pub use xform::PageXform;
 use xform::snap_to_pixels;
 use zoom::anchored_scroll;
@@ -3174,7 +3174,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         draw_pages(ui, viewport, view, &env, &mut page_out, &mut app.signature_preview)
     });
     let PageOut {
-        canvas_action,
+        mut canvas_action,
         clicked_link,
         comment_notice,
         copy_comments,
@@ -3216,6 +3216,9 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     view.auto_scroll.paint(ui, avail);
     if unobstructed && matches!(tool, QuickTool::Select | QuickTool::ColumnSelect) {
         copy_selected |= selection_actions(ui, avail, view, info, prefs, allowed && !comments_hidden, can_copy);
+        // Clicking an existing annotation shows its own bar (colour, Delete, Properties);
+        // an action the page already produced wins over the bar's.
+        canvas_action = canvas_action.or(annotation_actions(ui, avail, view, info, allowed && !comments_hidden));
     }
 
     // Collect all main-page demand, including cached surfaces, for byte admission later.

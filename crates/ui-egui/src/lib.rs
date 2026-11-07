@@ -150,7 +150,7 @@ use state::CopyPage;
 use state::OpenRequest;
 pub use state::{
     CommentClip, CustomDraft, Dialog, DuplicateDraft, LeftPanel, LinkOrigin, Mode, NumberDraft, OpenOutcome, PageClip, PagePropsDraft,
-    PasswordPrompt, PendingLink, PendingRemoteLink, PropsTab, QuickTool, RECENT_FILES_DEFAULT, RECENT_FILES_MAX, RecentFile, RightPanel,
+    PasswordPrompt, PendingLink, PendingRemoteLink, PropsTab, QuickTool, RECENT_FILES_DEFAULT, RECENT_FILES_MAX, RIBBON_TABS, RecentFile, RightPanel,
     UnlockPrompt,
 };
 use state::{DocumentCopyJob, GridFile};
@@ -294,6 +294,9 @@ pub struct PdfCraftApp {
     /// The user closed the right panel, so opening a document leaves it closed instead of
     /// showing its comments or bookmarks (#1590). Remembered across restarts.
     pub right_panel_closed: bool,
+    /// The user closed the Inspector, so it stays closed for this session even when a selection
+    /// appears. Session-only, unlike the panels above: it is never saved.
+    pub inspector_dismissed: bool,
     pub quick_tool: QuickTool,
     /// The tool to go back to when Space, held for a temporary Hand, is released.
     space_hand: Option<QuickTool>,
@@ -640,6 +643,8 @@ pub struct PdfCraftApp {
     control: Option<control::Control>,
     /// A bookmark being renamed in the Bookmarks panel: (path, text so far).
     pub bookmark_rename: Option<(Vec<usize>, String)>,
+    /// A document tab being renamed in the tab strip: (document, text so far).
+    pub tab_rename: Option<(pdfcraft_engine::DocId, String)>,
     /// Bookmarks copied or cut in the Bookmarks panel, with their subtrees, ready to paste into
     /// any document. Destinations are page indices.
     pub bookmark_clipboard: Option<Vec<pdfcraft_engine::OutlineNode>>,

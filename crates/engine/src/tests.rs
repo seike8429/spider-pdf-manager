@@ -10567,3 +10567,17 @@ fn imported_bookmarks_undo_in_one_step() {
     assert!(err.to_string().contains("no bookmark"), "{err}");
     assert!(s.get(id).unwrap().info.outline.is_empty());
 }
+
+#[test]
+fn rename_changes_the_display_name_and_nothing_else() {
+    let (mut s, id) = session_with(1);
+    assert_eq!(s.get(id).unwrap().name, "fixture.pdf");
+    assert!(!s.get(id).unwrap().dirty);
+    assert!(s.rename(id, "Renamed report".to_string()));
+    let doc = s.get(id).unwrap();
+    assert_eq!(doc.name, "Renamed report");
+    // A display rename is not a document edit: nothing to save, no generation bump.
+    assert!(!doc.dirty);
+    // An unknown document renames nothing.
+    assert!(!s.rename(DocId(999_999), "Nope".to_string()));
+}
