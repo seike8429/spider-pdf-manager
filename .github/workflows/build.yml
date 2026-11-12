@@ -63,9 +63,11 @@ jobs:
         with:
           name: SpiderPDFManager-windows-x64
           path: dist/
+          retention-days: 7
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: SpiderPDFManager-Setup
           path: installer\installer-out\*.exe
+          retention-days: 7
